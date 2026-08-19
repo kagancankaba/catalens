@@ -25,6 +25,12 @@ MongoDB Atlas Vector Search  ──►  candidate matches (cosine similarity, ca
 Confidence threshold  ──►  ranked matches OR "no match"
 ```
 
+## Screenshots
+
+| Home | Camera | Result |
+|---|---|---|
+| <img src="docs/screenshots/home.png" width="220" /> | <img src="docs/screenshots/camera.png" width="220" /> | <img src="docs/screenshots/result.png" width="220" /> |
+
 ## Tech stack
 
 | Layer | Technology |
