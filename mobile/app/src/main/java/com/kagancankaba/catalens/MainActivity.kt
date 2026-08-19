@@ -354,13 +354,24 @@ fun ResultDialog(
                         Text("Brand: ${d.brand}")
                         Text("Category: ${d.category}")
                         Text("Colour: ${d.colour}")
+                        d.attributes.forEach { attr ->
+                            Text("${attr.key}: ${attr.value}")
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            if (response.filterApplied != null) {
+                                "Filter applied: ${response.filterApplied}"
+                            } else {
+                                "Filter applied: none (searched all categories)"
+                            }
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                     if (response.noMatch) {
                         Text("No match found")
                     } else {
                         response.matches.forEach { match ->
-                            Text("${match.brand} ${match.name} - score: ${"%.2f".format(match.score)}")
+                            Text("${match.brand} ${match.name} - similarity: ${"%.2f".format(match.score)}")
                         }
                     }
                 }

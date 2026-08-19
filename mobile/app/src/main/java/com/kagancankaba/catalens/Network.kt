@@ -35,6 +35,7 @@ data class Match(
 @Serializable
 data class RecognizeResponse(
     val descriptor: Descriptor? = null,
+    val filterApplied: String? = null,
     val matches: List<Match> = emptyList(),
     val noMatch: Boolean = false
 )

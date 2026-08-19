@@ -52,16 +52,18 @@ func VisionResponseSchema(categories []string) *genai.Schema {
 
 func VisionDescribe(ctx context.Context, client *genai.Client, imageBytes []byte, mimeType string, categories []string) (*Descriptor, error) {
 	parts := []*genai.Part{
-		genai.NewPartFromText("Describe this product photo. Fill every field of the schema as accurately as possible."),
+		genai.NewPartFromText("Describe this product photo for a catalog search system. Be precise and consistent: use only the primary brand name printed on the product (no sub-labels or model lines), and list all clearly visible colours as a comma-separated list ordered by prominence (e.g. 'black, red, white'), not a vague summary word like 'multicolor'. Fill every field of the schema as accurately as possible."),
 		genai.NewPartFromBytes(imageBytes, mimeType),
 	}
 	contents := []*genai.Content{
 		genai.NewContentFromParts(parts, genai.RoleUser),
 	}
 
+	temperature := float32(0.1)
 	config := &genai.GenerateContentConfig{
 		ResponseMIMEType: "application/json",
 		ResponseSchema:   VisionResponseSchema(categories),
+		Temperature:      &temperature,
 	}
 
 	response, err := client.Models.GenerateContent(ctx, "gemini-flash-lite-latest", contents, config)

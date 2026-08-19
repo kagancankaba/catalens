@@ -17,7 +17,7 @@ import (
 
 var categories = []string{"sneakers", "tea", "chairs"}
 
-const confidenceThreshold = 0.9
+const confidenceThreshold = 0.85
 
 type RecognizeResponse struct {
 	Descriptor    *catalog.Descriptor `json:"descriptor"`
