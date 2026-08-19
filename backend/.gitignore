@@ -1,0 +1,4 @@
+.env
+*.exe
+sample.b64
+vision_request.json
