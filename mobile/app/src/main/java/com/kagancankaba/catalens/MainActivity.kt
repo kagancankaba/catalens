@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -59,6 +60,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Executors
 import androidx.compose.ui.draw.clip
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,12 +94,14 @@ fun CatalensApp(modifier: Modifier = Modifier) {
     var result by remember { mutableStateOf<RecognizeResponse?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var resultImageBytes by remember { mutableStateOf<ByteArray?>(null) }
     val scope = rememberCoroutineScope()
 
     fun processImage(bytes: ByteArray) {
         screen = Screen.HOME
         result = null
         errorMessage = null
+        resultImageBytes = bytes
         isLoading = true
         scope.launch {
             try {
@@ -161,9 +168,11 @@ fun CatalensApp(modifier: Modifier = Modifier) {
         ResultDialog(
             result = result,
             errorMessage = errorMessage,
+            imageBytes = resultImageBytes,
             onDismiss = {
                 result = null
                 errorMessage = null
+                resultImageBytes = null
             }
         )
     }
@@ -304,6 +313,7 @@ fun CameraPreviewWithCapture(
 fun ResultDialog(
     result: RecognizeResponse?,
     errorMessage: String?,
+    imageBytes: ByteArray?,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -318,6 +328,24 @@ fun ResultDialog(
         },
         text = {
             Column {
+                imageBytes?.let { bytes ->
+                    val bitmap = remember(bytes) {
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    }
+                    bitmap?.let {
+                        Image(
+                            bitmap = it.asImageBitmap(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(180.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
+
                 errorMessage?.let {
                     Text(it)
                 }
