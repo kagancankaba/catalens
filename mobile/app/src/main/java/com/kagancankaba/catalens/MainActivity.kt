@@ -110,8 +110,8 @@ fun CatalensApp(modifier: Modifier = Modifier) {
                 }
                 result = response
             } catch (e: Exception) {
-                Log.e("Catalens", "istek basarisiz", e)
-                errorMessage = e.message ?: "bilinmeyen hata"
+                Log.e("Catalens", "request failed", e)
+                errorMessage = e.message ?: "unknown error"
             } finally {
                 isLoading = false
             }
@@ -204,7 +204,7 @@ fun HomeScreen(
                 modifier = Modifier.size(width = 140.dp, height = 105.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Text("Kamera")
+                Text("Camera")
             }
 
             Button(
@@ -212,7 +212,7 @@ fun HomeScreen(
                 modifier = Modifier.size(width = 140.dp, height = 105.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Text("Galeri")
+                Text("Gallery")
             }
         }
 
@@ -320,11 +320,11 @@ fun ResultDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Kapat")
+                Text("Close")
             }
         },
         title = {
-            Text(if (errorMessage != null) "Hata" else "Sonuç")
+            Text(if (errorMessage != null) "Error" else "Result")
         },
         text = {
             Column {
@@ -351,16 +351,16 @@ fun ResultDialog(
                 }
                 result?.let { response ->
                     response.descriptor?.let { d ->
-                        Text("Marka: ${d.brand}")
-                        Text("Kategori: ${d.category}")
-                        Text("Renk: ${d.colour}")
+                        Text("Brand: ${d.brand}")
+                        Text("Category: ${d.category}")
+                        Text("Colour: ${d.colour}")
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                     if (response.noMatch) {
-                        Text("Eşleşme bulunamadı")
+                        Text("No match found")
                     } else {
                         response.matches.forEach { match ->
-                            Text("${match.brand} ${match.name} - skor: ${"%.2f".format(match.score)}")
+                            Text("${match.brand} ${match.name} - score: ${"%.2f".format(match.score)}")
                         }
                     }
                 }
