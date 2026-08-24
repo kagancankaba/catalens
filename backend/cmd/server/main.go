@@ -115,6 +115,11 @@ func main() {
 			filterApplied = nil
 		}
 
+		textMatches, err := catalog.TextSearch(reqCtx, collection, text, 10)
+		if err == nil {
+			matches = catalog.BlendScores(matches, textMatches)
+		}
+
 		confident := []catalog.Match{}
 		for _, m := range matches {
 			if m.Score >= confidenceThreshold {
