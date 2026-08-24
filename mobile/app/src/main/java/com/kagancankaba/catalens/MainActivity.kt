@@ -374,6 +374,13 @@ fun ResultDialog(
                             Text("${match.brand} ${match.name} - similarity: ${"%.2f".format(match.score)}")
                         }
                     }
+                    if (response.substitutes.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Out of stock — similar in-stock alternatives:")
+                        response.substitutes.forEach { sub ->
+                            Text("${sub.brand} ${sub.name} - similarity: ${"%.2f".format(sub.score)}")
+                        }
+                    }
                 }
             }
         }

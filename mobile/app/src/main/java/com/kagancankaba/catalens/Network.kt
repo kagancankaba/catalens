@@ -37,7 +37,8 @@ data class RecognizeResponse(
     val descriptor: Descriptor? = null,
     val filterApplied: String? = null,
     val matches: List<Match> = emptyList(),
-    val noMatch: Boolean = false
+    val noMatch: Boolean = false,
+    val substitutes: List<Match> = emptyList()
 )
 
 private val client = OkHttpClient()

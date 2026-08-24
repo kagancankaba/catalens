@@ -24,6 +24,7 @@ type RecognizeResponse struct {
 	FilterApplied any                 `json:"filterApplied"`
 	Matches       []catalog.Match     `json:"matches"`
 	NoMatch       bool                `json:"noMatch"`
+	Substitutes   []catalog.Match     `json:"substitutes"`
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
@@ -127,11 +128,21 @@ func main() {
 			}
 		}
 
+		substitutes := []catalog.Match{}
+		if len(confident) > 0 && !confident[0].InStock {
+			if embedding, err := catalog.ProductEmbedding(reqCtx, collection, confident[0].ID); err == nil {
+				if subs, err := catalog.FindSubstitutes(reqCtx, collection, confident[0].ID, embedding, descriptor.Category, 5); err == nil {
+					substitutes = subs
+				}
+			}
+		}
+
 		response := RecognizeResponse{
 			Descriptor:    descriptor,
 			FilterApplied: filterApplied,
 			Matches:       confident,
 			NoMatch:       len(confident) == 0,
+			Substitutes:   substitutes,
 		}
 
 		w.Header().Set("Content-Type", "application/json")

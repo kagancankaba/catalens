@@ -9,10 +9,11 @@ import (
 )
 
 type Match struct {
-	ID    string  `bson:"id" json:"id"`
-	Name  string  `bson:"name" json:"name"`
-	Brand string  `bson:"brand" json:"brand"`
-	Score float64 `bson:"score" json:"score"`
+	ID      string  `bson:"id" json:"id"`
+	Name    string  `bson:"name" json:"name"`
+	Brand   string  `bson:"brand" json:"brand"`
+	Score   float64 `bson:"score" json:"score"`
+	InStock bool    `bson:"inStock" json:"inStock"`
 }
 
 func VectorSearch(ctx context.Context, collection *mongo.Collection, vector []float64, category string, limit int) ([]Match, error) {
@@ -30,11 +31,12 @@ func VectorSearch(ctx context.Context, collection *mongo.Collection, vector []fl
 	pipeline := mongo.Pipeline{
 		{{Key: "$vectorSearch", Value: VectorSearchStage}},
 		{{Key: "$project", Value: bson.M{
-			"_id":   0,
-			"id":    bson.M{"$toString": "$_id"},
-			"name":  1,
-			"brand": 1,
-			"score": bson.M{"$meta": "vectorSearchScore"},
+			"_id":     0,
+			"id":      bson.M{"$toString": "$_id"},
+			"name":    1,
+			"brand":   1,
+			"inStock": 1,
+			"score":   bson.M{"$meta": "vectorSearchScore"},
 		}}},
 	}
 	cursor, err := collection.Aggregate(ctx, pipeline)
