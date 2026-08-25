@@ -25,6 +25,14 @@ MongoDB Atlas Vector Search  ──►  candidate matches (cosine similarity, ca
 Confidence threshold  ──►  ranked matches OR "no match"
 ```
 
+## Optional modules
+
+Beyond the core single-product pipeline above, the backend also implements:
+
+- **Hybrid Match** — blends MongoDB Atlas Search full-text relevance with vector similarity to re-rank candidates, so exact brand/name mentions in the descriptor help break ties between visually similar products.
+- **Visual Substitutes** — when the top confident match is out of stock, the server re-runs vector search filtered to the same category and `inStock: true` to suggest in-stock alternatives.
+- **Multi-Shelf Recognition** — a separate `POST /recognize-multi` endpoint detects and describes every distinct product in a single photo (each with a normalized bounding box), then runs the full recognition pipeline per item. The mobile app always uses this endpoint; a photo with one product just returns a one-item result, and a photo with several shows a swipeable result per product, cropped to that product's region of the source photo. Results are capped at the 5 largest detected items.
+
 ## Screenshots
 
 | Home | Camera | Result |
@@ -48,14 +56,14 @@ catalens/
 ├── backend/
 │   ├── cmd/
 │   │   ├── seed/       # ingest script: embeds products.json into MongoDB
-│   │   └── server/     # HTTP server exposing POST /recognize
+│   │   └── server/     # HTTP server exposing POST /recognize and /recognize-multi
 │   ├── internal/
-│   │   ├── catalog/    # product model, embedding logic, vision schema, vector search
+│   │   ├── catalog/    # product model, embedding logic, vision schema, vector/hybrid search, substitutes
 │   │   └── config/     # .env loader
 │   └── data/
 │       └── products.json
 └── mobile/
-    └── app/            # Jetpack Compose app (camera + gallery capture, results UI)
+    └── app/            # Jetpack Compose app (camera + gallery capture, swipeable results UI)
 ```
 
 ## Why this stack
@@ -95,6 +103,39 @@ Response:
 ```
 
 If no candidate clears the confidence threshold, `matches` is an empty array and `noMatch` is `true`.
+
+### `POST /recognize-multi`
+
+Multipart form request with an `image` field, for photos containing more than one product (e.g. a shelf). Runs Vision once to detect and describe every distinct product, then runs the same recognition pipeline per item.
+
+```bash
+curl -X POST -F "image=@shelf.jpg" http://localhost:8080/recognize-multi
+```
+
+Response:
+
+```json
+{
+  "items": [
+    {
+      "descriptor": {
+        "brand": "Nike",
+        "category": "sneakers",
+        "colour": "black, white",
+        "form": "running shoes",
+        "visibleText": "Nike",
+        "attributes": [{ "key": "closure", "value": "lace-up" }],
+        "boundingBox": { "xMin": 0.04, "yMin": 0.46, "xMax": 0.46, "yMax": 0.84 }
+      },
+      "filterApplied": "sneakers",
+      "matches": [{ "id": "...", "name": "Air Jordan 1 Low", "brand": "Nike", "score": 0.87 }],
+      "noMatch": false
+    }
+  ]
+}
+```
+
+`boundingBox` coordinates are fractions (0–1) of image width/height, top-left to bottom-right — used by the mobile client to crop each result to its own region of the source photo. Detected items are sorted by bounding box area (largest first) and capped at 5.
 
 ## Running it locally
 

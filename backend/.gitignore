@@ -2,3 +2,5 @@
 *.exe
 sample.b64
 vision_request.json
+sample*.jpg
+sample*.png
