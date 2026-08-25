@@ -64,6 +64,9 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import android.graphics.Bitmap
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -91,7 +94,7 @@ fun CatalensApp(modifier: Modifier = Modifier) {
     }
 
     var screen by remember { mutableStateOf(Screen.HOME) }
-    var result by remember { mutableStateOf<RecognizeResponse?>(null) }
+    var result by remember { mutableStateOf<RecognizeMultiResponse?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var resultImageBytes by remember { mutableStateOf<ByteArray?>(null) }
@@ -106,7 +109,7 @@ fun CatalensApp(modifier: Modifier = Modifier) {
         scope.launch {
             try {
                 val response = withContext(Dispatchers.IO) {
-                    recognizeImage(bytes)
+                    recognizeImageMulti(bytes)
                 }
                 result = response
             } catch (e: Exception) {
@@ -309,9 +312,18 @@ fun CameraPreviewWithCapture(
     }
 }
 
+private fun cropToBoundingBox(bitmap: Bitmap, box: BoundingBox?): Bitmap {
+    if (box == null) return bitmap
+    val left = (box.xMin * bitmap.width).toInt().coerceIn(0, bitmap.width - 1)
+    val top = (box.yMin * bitmap.height).toInt().coerceIn(0, bitmap.height - 1)
+    val right = (box.xMax * bitmap.width).toInt().coerceIn(left + 1, bitmap.width)
+    val bottom = (box.yMax * bitmap.height).toInt().coerceIn(top + 1, bitmap.height)
+    return Bitmap.createBitmap(bitmap, left, top, right - left, bottom - top)
+}
+
 @Composable
 fun ResultDialog(
-    result: RecognizeResponse?,
+    result: RecognizeMultiResponse?,
     errorMessage: String?,
     imageBytes: ByteArray?,
     onDismiss: () -> Unit
@@ -328,58 +340,83 @@ fun ResultDialog(
         },
         text = {
             Column {
-                imageBytes?.let { bytes ->
-                    val bitmap = remember(bytes) {
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                if (errorMessage != null) {
+                    Text(errorMessage)
+                } else if (result != null && imageBytes != null) {
+                    val bitmap = remember(imageBytes) {
+                        BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
                     }
-                    bitmap?.let {
-                        Image(
-                            bitmap = it.asImageBitmap(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(180.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-                }
+                    val items = result.items
 
-                errorMessage?.let {
-                    Text(it)
-                }
-                result?.let { response ->
-                    response.descriptor?.let { d ->
-                        Text("Brand: ${d.brand}")
-                        Text("Category: ${d.category}")
-                        Text("Colour: ${d.colour}")
-                        d.attributes.forEach { attr ->
-                            Text("${attr.key}: ${attr.value}")
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            if (response.filterApplied != null) {
-                                "Filter applied: ${response.filterApplied}"
-                            } else {
-                                "Filter applied: none (searched all categories)"
+                    if (bitmap != null && items.isNotEmpty()) {
+                        val pagerState = rememberPagerState(pageCount = { items.size })
+
+                        HorizontalPager(state = pagerState) { page ->
+                            val item = items[page]
+                            val cropped = remember(bitmap, item.descriptor.boundingBox) {
+                                cropToBoundingBox(bitmap, item.descriptor.boundingBox)
                             }
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                    if (response.noMatch) {
-                        Text("No match found")
+                            Column {
+                                Image(
+                                    bitmap = cropped.asImageBitmap(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(180.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Text("Brand: ${item.descriptor.brand}")
+                                Text("Category: ${item.descriptor.category}")
+                                Text("Colour: ${item.descriptor.colour}")
+                                item.descriptor.attributes.forEach { attr ->
+                                    Text("${attr.key}: ${attr.value}")
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    if (item.filterApplied != null) {
+                                        "Filter applied: ${item.filterApplied}"
+                                    } else {
+                                        "Filter applied: none (searched all categories)"
+                                    }
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                if (item.noMatch) {
+                                    Text("No match found")
+                                } else {
+                                    item.matches.forEach { match ->
+                                        Text("${match.brand} ${match.name} - similarity: ${"%.2f".format(match.score)}")
+                                    }
+                                }
+                            }
+                        }
+
+                        if (items.size > 1) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                repeat(items.size) { index ->
+                                    val selected = pagerState.currentPage == index
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(4.dp)
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (selected) MaterialTheme.colorScheme.onSurface
+                                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                            )
+                                    )
+                                }
+                            }
+                        }
                     } else {
-                        response.matches.forEach { match ->
-                            Text("${match.brand} ${match.name} - similarity: ${"%.2f".format(match.score)}")
-                        }
-                    }
-                    if (response.substitutes.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Out of stock — similar in-stock alternatives:")
-                        response.substitutes.forEach { sub ->
-                            Text("${sub.brand} ${sub.name} - similarity: ${"%.2f".format(sub.score)}")
-                        }
+                        Text("No products detected")
                     }
                 }
             }

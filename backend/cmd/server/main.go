@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 
 	"github.com/kagancankaba/catalens/internal/catalog"
 	"github.com/kagancankaba/catalens/internal/config"
@@ -17,7 +18,7 @@ import (
 
 var categories = []string{"sneakers", "tea", "chairs"}
 
-const confidenceThreshold = 0.85
+const confidenceThreshold = 0.87
 
 type RecognizeResponse struct {
 	Descriptor    *catalog.Descriptor `json:"descriptor"`
@@ -25,6 +26,17 @@ type RecognizeResponse struct {
 	Matches       []catalog.Match     `json:"matches"`
 	NoMatch       bool                `json:"noMatch"`
 	Substitutes   []catalog.Match     `json:"substitutes"`
+}
+
+type ItemResult struct {
+	Descriptor    catalog.Descriptor `json:"descriptor"`
+	FilterApplied any				 `json:"filterApplied"`
+	Matches 	  []catalog.Match	 `json:"matches"`
+	NoMatch 	  bool				 `json:"noMatch"`
+}
+
+type RecognizeMultiResponse struct {
+	Items []ItemResult `json:"items"`
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
@@ -144,6 +156,99 @@ func main() {
 			NoMatch:       len(confident) == 0,
 			Substitutes:   substitutes,
 		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	})
+
+	mux.HandleFunc("/recognize-multi", func(w http.ResponseWriter, r *http.Request) {
+		reqCtx := r.Context()
+
+		file, header, err := r.FormFile("image")
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "Image Required")
+			return
+		}
+		defer file.Close()
+
+		imageBytes, err := io.ReadAll(file)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "Image Required")
+			return
+		}
+
+		mimeType := header.Header.Get("Content-Type")
+		if mimeType ==  "" {
+			mimeType = "image/jpeg"
+		}
+
+		descriptors, err := catalog.VisionDescribeMulti(reqCtx, geminiClient, imageBytes, mimeType, categories)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "Vision Unavailable")
+			return
+		}
+
+				sort.Slice(descriptors, func(i, j int) bool {
+			areaI := 0.0
+			if descriptors[i].BoundingBox != nil {
+				b := descriptors[i].BoundingBox
+				areaI = (b.XMax - b.XMin) * (b.YMax - b.YMin)
+			}
+			areaJ := 0.0
+			if descriptors[j].BoundingBox != nil {
+				b := descriptors[j].BoundingBox
+				areaJ = (b.XMax - b.XMin) * (b.YMax - b.YMin)
+			}
+			return areaI > areaJ
+		})
+
+		if len(descriptors) > 5 {
+			descriptors = descriptors[:5]
+		}
+
+		items := []ItemResult{}
+		for _, descriptor := range descriptors {
+			text := catalog.EmbeddingTextFromDescriptor(descriptor)
+			vector, err := catalog.Embed(reqCtx, geminiClient, text)
+			if err != nil {
+				continue
+			}
+		
+		matches, err := catalog.VectorSearch(reqCtx, collection, vector, descriptor.Category, 5)
+		if err != nil {
+			continue
+		}
+
+		var filterApplied any = descriptor.Category
+		if len(matches) == 0 && descriptor.Category != "" {
+			matches, err = catalog.VectorSearch(reqCtx, collection, vector, "", 5)
+			if err != nil {
+				continue
+			}
+			filterApplied = nil
+		}
+
+		textMatches, err := catalog.TextSearch(reqCtx, collection, text, 10)
+			if err == nil {
+				matches = catalog.BlendScores(matches, textMatches)
+			}
+
+		confident := []catalog.Match{}
+		for _, m := range matches {
+			if m.Score >= confidenceThreshold {
+				confident = append(confident, m)
+			}
+		}
+
+		items = append(items, ItemResult{
+				Descriptor:    descriptor,
+				FilterApplied: filterApplied,
+				Matches: 	   confident,
+				NoMatch: 	   len(confident) == 0,
+			})
+		}
+
+		response := RecognizeMultiResponse{Items: items}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)

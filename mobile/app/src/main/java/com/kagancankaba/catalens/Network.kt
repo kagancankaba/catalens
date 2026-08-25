@@ -14,6 +14,15 @@ data class AttributeKV(
     val value: String
 )
 
+
+@Serializable
+data class BoundingBox(
+    val xMin: Double,
+    val yMin: Double,
+    val xMax: Double,
+    val yMax: Double
+)
+
 @Serializable
 data class Descriptor(
     val brand: String,
@@ -21,7 +30,8 @@ data class Descriptor(
     val colour: String,
     val form: String,
     val visibleText: String,
-    val attributes: List<AttributeKV>
+    val attributes: List<AttributeKV>,
+    val boundingBox: BoundingBox? = null
 )
 
 @Serializable
@@ -62,5 +72,39 @@ fun recognizeImage(imageBytes: ByteArray): RecognizeResponse {
     client.newCall(request).execute().use { response ->
         val body = response.body?.string() ?: throw Exception("empty response")
         return json.decodeFromString<RecognizeResponse>(body)
+    }
+}
+
+@Serializable
+data class ItemResult(
+    val descriptor: Descriptor,
+    val filterApplied: String? = null,
+    val matches: List<Match> = emptyList(),
+    val noMatch: Boolean = false
+)
+
+@Serializable
+data class RecognizeMultiResponse(
+    val items: List<ItemResult> = emptyList()
+)
+
+fun recognizeImageMulti(imageBytes: ByteArray): RecognizeMultiResponse {
+    val requestBody = MultipartBody.Builder()
+        .setType(MultipartBody.FORM)
+        .addFormDataPart(
+            "image",
+            "photo.jpg",
+            imageBytes.toRequestBody("image/jpeg".toMediaType())
+        )
+        .build()
+
+    val request = Request.Builder()
+        .url("http://127.0.0.1:8080/recognize-multi")
+        .post(requestBody)
+        .build()
+
+    client.newCall(request).execute().use { response ->
+        val body = response.body?.string() ?: throw Exception("empty response")
+        return json.decodeFromString<RecognizeMultiResponse>(body)
     }
 }
